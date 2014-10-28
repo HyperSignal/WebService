@@ -284,7 +284,7 @@ function hsv2rgb(h, s, v)	{
 		g 		= 0,
 		b 		= 0;
 
-	switch(hi)	{
+		switch(hi)	{
 		case 0: 	r = v; g = t; b = p;	break;
 		case 1: 	r = q; g = v; b = p; 	break;
 		case 2: 	r = p; g = v; b = t; 	break;

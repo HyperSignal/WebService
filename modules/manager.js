@@ -48,6 +48,10 @@ function GetGoogleTileFromHS(x,y,zoom) {
 	return tool.GoogleTile(latlon[0], latlon[1], zoom)
 }
 
+function CorrectOperator(val)	{
+	return val;	//	TODO
+}
+
 /**
  * 		This is a simple version of Python HyperSignal Manager
  * 		This doesn't do the Tile Generation Stuff
@@ -212,8 +216,197 @@ HSManager.prototype.ProcessSignal			=	function(lat,lon,value,operator,weight, cb
 	});
 }
 
+HSManager.prototype.AddUser 				=	function(username,uid,name,email,lastip,city,country,client,errcb)	{
+	var log = this.log;
+	client = client || this.conn;
+	count = count === undefined ? 1 : count;
+	client.query(
+		"INSERT INTO `users`(`uid`,`username`,`name`,`email`,`date`,`lastip`,`sentkm`,`city`,`country`,`lastaccess`) VALUES(?, ?, ?, ?, CURDATE(), ?, 0, ?, ?, NOW()) ON DUPLICATE KEY UPDATE `uid`=`uid`, `username`= VALUES(`username`), `name` = VALUES(`name`), `email` = VALUES(`email`), `date` = `date`, `lastip` = VALUES(`lastip`), `sentkm` = `sentkm`, `city` = VALUES(`city`), `country` = VALUES(`country`), `lastaccess` = NOW()",
+		[uid,username,name,email,lastip,city,country], function(err, result)	{
+			if(err)
+				log.e("HSManager::AddStatistics - Failed to insert data to Database: "+err+"\n\t\tArguments: "+[username,uid,name,email,lastip,city,country].toString());
+			if(errcb)
+				errcb(err);	
+	});	
+}
+
+HSManager.prototype.IncUserKM 				=	function(uid,val,client,errcb)	{
+	var log = this.log;
+	client = client || this.conn;
+	val = val === undefined ? 0.1 : val;
+	client.query(
+		"UPDATE `users` SET `sentkm` = `sentkm` + ? WHERE `uid` = ?",
+		[val,uid], function(err, result)	{
+			if(err)
+				log.e("HSManager::IncUserKM - Failed to insert data to Database: "+err+"\n\t\tArguments: "+[val,uid].toString());
+			if(errcb)
+				errcb(err);	
+	});	
+}
+HSManager.prototype.AddAntenna 				=	function(lat,lon,operator,client,errcb)	{
+	operator = OperatorCorrect(operator)
+	var log = this.log;
+	client = client || this.conn;
+	client.query(
+		"INSERT INTO `antennas` VALUES(?,?,?) ON DUPLICATE KEY UPDATE `lat`=`lat`",
+		[lat,lon,operator], function(err, result)	{
+			if(err)
+				log.e("HSManager::AddAntenna - Failed to insert data to Database: "+err+"\n\t\tArguments: "+[lat,lon,operator].toString());
+			if(errcb)
+				errcb(err);	
+	});	
+	this.AddStatistics("tower");
+}
+
+HSManager.prototype.AddDevice 				=	function(uid, device, manufacturer, model, brand, android, release, signal,client,errcb)	{
+	var log = this.log;
+	client = client || this.conn;
+	client.query(
+		"INSERT INTO `devices` VALUES(?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE `signal` = (VALUES(`signal`) + `signal`) / 2",
+		[uid, device, manufacturer, model, brand, android, release, signal], function(err, result)	{
+			if(err)
+				log.e("HSManager::AddDevice- Failed to insert data to Database: "+err+"\n\t\tArguments: "+[uid, device, manufacturer, model, brand, android, release, signal].toString());
+			if(errcb)
+				errcb(err);	
+	});	
+}
 
 
+HSManager.prototype.FetchAntennas 			=	function(minlat,minlon,maxlat,maxlon,operator,client,cb)	{
+	var log = this.log;
+	client = client || this.conn;
+	client.query(
+		"SELECT * FROM antennas	WHERE `lat` >= ? and `lon` >= ? and `lat` < ? and `lon` < ? and `operator` = ?",
+		[minlat,minlon,maxlat,maxlon,operator], function(err, rows, fields)	{
+			if(err)	{
+				log.e("HSManager::FetchAntennas- Failed to retrieve Antennas from Database: "+err+"\n\t\tArguments: "+[minlat,minlon,maxlat,maxlon,operator].toString());
+				cb(err);
+			}else if(cb) 
+				cb(err, rows);
+	});	
+}
+
+HSManager.prototype.FetchOperators 				=	function(client,errcb)	{
+	var log = this.log;
+	client = client || this.conn;
+	client.query(
+		"SELECT `operator` FROM `tiles` GROUP BY `operator`", [], function(err, rows, fields)	{
+			if(err)	{
+				log.e("HSManager::FetchOperators - Failed to retrieve Operators from Database: "+err);
+				cb(err);
+			}else if(cb) {
+				var ops = [];
+				for(var i in rows)
+					ops.push(rows[i].operator);
+				cb(err, ops);
+			}
+	});	
+}
+
+
+HSManager.prototype.FetchDayStatistics 			=	function(client,errcb)	{
+	var log = this.log;
+	client = client || this.conn;
+	client.query(
+		"SELECT * FROM `statistics` WHERE `date` = CURDATE()", [], function(err, rows, fields)	{
+			if(err)	{
+				log.e("HSManager::FetchDayStatistics - Failed to retrieve Operators from Database: "+err);
+				cb(err);
+			}else if(cb) {
+				var statistics = {};
+				for(var i in rows)
+					statistics[rows[i].type] = rows[i].count;
+				cb(err, statistics);
+			}
+	});	
+}
+
+HSManager.prototype.FetchNumOperators 			=	function(client,errcb)	{
+	self.cursor = self.con.cursor()
+	self.cursor.execute("")
+	row		=	self.cursor.fetchone()
+	numops = int(row[0])
+	return numops
+
+	var log = this.log;
+	client = client || this.conn;
+	client.query(
+		"SELECT COUNT(*) as `opcount` FROM (SELECT `operator` FROM `tiles` GROUP BY `operator`) tbl1 ", [], function(err, rows, fields)	{
+			if(err)	{
+				log.e("HSManager::FetchDayStatistics - Failed to retrieve Operators from Database: "+err);
+				cb(err);
+			}else if(cb) 
+				cb(err, rows[0].opcount);
+
+	});	
+}
+/*
+
+TODO
+
+HSManager.prototype.FetchNumTiles 				=	function(self,client,errcb):
+	self.cursor = self.con.cursor()
+	self.cursor.execute("SELECT COUNT(*) FROM `tiles`")
+	row		=	self.cursor.fetchone()
+	numtiles = int(row[0])
+	return numtiles
+	
+HSManager.prototype.FetchTilesToDo 				=	function(self,operator,alltiles=False,client,errcb):
+	self.cursor = self.con.cursor()
+	if alltiles:
+		self.cursor.execute("SELECT * FROM `tiles` WHERE `operator` = %s", (operator))
+	else:
+		self.cursor.execute("SELECT * FROM `tiles` WHERE `operator` = %s and `updated` = 0", (operator))
+
+	row		=	self.cursor.fetchone()
+	tiles	=	{}
+
+	for zoom in range(config.HYPER_ZOOM_RANGE[0],config.HYPER_ZOOM_RANGE[1]):
+		tiles[zoom] = []
+	numtiles	=	0
+
+	while row is not None:
+		tiles[row[2]].append( (row[2],row[0],row[1],row[3]) )
+		row = self.cursor.fetchone()
+		numtiles	=	numtiles + 1
+
+	return tiles,numtiles
+
+HSManager.prototype.FetchOperatorName 			=	function(self,mcc,mnc,client,errcb):
+	self.cursor = self.con.cursor()
+	self.cursor.execute("SELECT * FROM `operators`	WHERE `mcc` = %s and `mnc` = %s", (mcc,mnc))
+	row		=	self.cursor.fetchone()
+	if row != None:
+		return row[2].decode("ISO-8859-1").encode("UTF-8")
+	else:
+		return str(mcc)+str(mnc)
+
+HSManager.prototype.FetchOperatorList 			=	function(self,client,errcb):
+	self.cursor = self.con.cursor()
+	self.cursor.execute("SELECT * FROM `operators`")
+	data = self.cursor.fetchall()
+	newdata = []
+	for i in range(len(data)):
+		newdata.append((data[i][0],data[i][1],data[i][2],data[i][3].decode("ISO-8859-1").encode("UTF-8")))
+	return newdata
+
+HSManager.prototype.RemoveTileToDo 				=	function(self, z, x, y, operator,client,errcb):
+	self.cursor = self.con.cursor()
+	self.cursor.execute("UPDATE tiles SET `updated` = 1 WHERE x = %s and y = %s and z = %s and operator = %s", (x,y,z,operator))
+
+HSManager.prototype.FetchBlock 					=	function(self,start,end,operator,client,errcb):
+	self.cursor = self.con.cursor()
+	self.cursor.execute("SELECT * FROM datamatrix WHERE x >= %s and x < %s and y >= %s and y < %s and operator = %s",(start[0],end[0],start[1],end[1],operator))
+	blockdata = self.cursor.fetchall()
+	block = numpy.zeros((end[0]-start[0],end[1]-start[1]),dtype=numpy.uint8)
+	block.fill(-1)
+	for data in blockdata:
+		x			=	int(data[0]) - start[0]
+		y			=	int(data[1]) - start[1]
+		sig			=	int(data[2])
+		block[x,y]	=	sig
+	return block
+*/
 
 
 
