@@ -1,12 +1,14 @@
+var _tup = require('./modules/theupcrypter.js');
 
-
-var apimanager = function(database, app, config)	{
+var apimanager = function(manager, app, hslog, config)	{
 	console.log("Initializing API Manager");
 
-	this.db 	= database;
-	this.app 	= app;
-	this.config	= config;
-	var _this 	= this;
+	this.man 	=	manager;
+	this.app 	= 	app;
+	this.config	= 	config;
+	this.log 	=	hslog;
+	this.tup 	= 	new _tup.TheUpCrypter(config.hskey, config.hsiv, hslog);
+	var _this 	= 	this;
 }
 
 
