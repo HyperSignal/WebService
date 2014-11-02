@@ -4,11 +4,11 @@ var queues 			= 	require('mysql-queues');
 var HYPER_STEP		=	0.0005;							//	Step used on Database. 0.0005 gives us a ~100m precision
 var HYPER_BRUSH		=	2;								//	Interpolation Brush Delta Size (-X,X) to (-Y,Y)
 var HYPER_BRUSH_INT	=	[	
-							[0	,0	,0	,0	,0],		//	|
-							[0	,0.5,0.5,0.5,0],		//	|
-							[0	,0.5,1	,0.5,0],		//	|---- Interpolation Brush
-							[0	,0.5,0.5,0.5,0],		//	|
-							[0	,0	,0	,0	,0]			//	|
+							[0.2	,0.1	,0.2	,0.1	,0.2],		//	|
+							[0.1	,0.8	,0.8	,0.8	,0.1],		//	|
+							[0.2	,0.8	,1		,0.8	,0.2],		//	|---- Interpolation Brush
+							[0.1	,0.8	,0.8	,0.8	,0.1],		//	|
+							[0.2	,0.1	,0.2	,0.1	,0.2]		//	|
 						];						
 
 /*

@@ -95,7 +95,7 @@ HSLogger.prototype.__printmsg =	function(level, msg, n)	{
 			break;
 	}
 	var date = new Date(Date.now());
-	msg = colors.help(date.toString()) + colors.info("["+level+"]: ") + msg;
+	msg = colors.help(date.toString()) + colors.info(" ["+level+"]: ") + msg;
 	console.log(msg);
 }
 
@@ -297,3 +297,6 @@ function hsv2rgb(h, s, v)	{
 	b = Math.round(b*255);
 	return [r, g, b];
 }
+
+
+exports.HSLogger = HSLogger;
