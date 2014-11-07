@@ -28,8 +28,10 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-var _tup = require('./modules/theupcrypter.js');
-var fs = require('fs');
+var _tup 		= require('./modules/theupcrypter.js');
+var _man 		= require('./modules/manager.js');
+var compressor 	= require('node-minify');
+var fs 			= require('fs');
 
 var apimanager = function(manager, app, config, hslog)	{
 	console.log("Initializing API Manager");
@@ -40,6 +42,7 @@ var apimanager = function(manager, app, config, hslog)	{
 	this.log 	=	hslog;
 	this.tup 	= 	new _tup.TheUpCrypter(config.hskey, config.hsiv, hslog);
 	var _this 	= 	this;
+	this.lang	=	new _man.LanguageManager(config.paths.basepath, log);
 	app.get("/"							,	function(r, q) { _this.apibase(r,q); 			});
 }
 
@@ -96,14 +99,67 @@ apimanager.prototype.oplogo			=	function(req, res)	{
  *	Returns an Minified Javascript File
  **/
 apimanager.prototype.jscript		=	function(req, res)	{
-	//TODO
+	var _this	= 	this;
+	var log 	=	this.log;
+	var lang 	=	req.body.hasOwnProperty("lang") ? req.body.lang : "default";
+	var file 	=	this.config.paths.jspath + "/" + req.body.jscript + ".js";
+	var fileOut =	this.config.cachedir + "/" + lang + "-" + req.body.jscript + ".js";
+	fs.exists(file, function(exists)	{
+		if(exists)
+			new compressor.minify({
+			    type: 'gcc',
+			    fileIn: file,
+			    fileOut: fileOut,
+			    callback: function(err, min){
+			    	if(err)	{
+			    		log.e("Error minifying file "+file);
+			    		_this.__nresponse("Internal Error", req, res, 500);
+			    	}else{
+			    		_this.lang.LangReplace(min, lang, function(text) {
+			    			_this.__nresponse(text, req, res);
+			    		});
+			    	}
+			    }
+			});
+		else{
+			log.i("File Not Found (404): "+file);
+			_this.__nresponse("404: File not found",req,res,404);
+		}
+	});
 }
 
 /**
  *	Returns an Minified CSS File
  **/
 apimanager.prototype.css			=	function(req, res)	{
-	//TODO
+	var _this	= 	this;
+	var log 	=	this.log;
+	var lang 	=	req.body.hasOwnProperty("lang") ? req.body.lang : "default";
+	var file 	=	this.config.paths.csspath + "/" + req.body.css + ".js";
+	var fileOut =	this.config.cachedir + "/" + lang + "-" + req.body.css + ".css";
+
+	fs.exists(file, function(exists)	{
+		if(exists)
+			new compressor.minify({
+			    type: 'yui-css',
+			    fileIn: file,
+			    fileOut: fileOut,
+			    callback: function(err, min){
+			    	if(err)	{
+			    		log.e("Error minifying file "+file);
+			    		_this.__nresponse("Internal Error", req, res, 500);
+			    	}else{
+			    		_this.lang.LangReplace(min, lang, function(text) {
+			    			_this.__nresponse(text, req, res);
+			    		});
+			    	}
+			    }
+			});
+		else{
+			log.i("File Not Found (404): "+file);
+			_this.__nresponse("404: File not found",req,res,404);
+		}
+	});
 }
 
 /**
@@ -178,13 +234,13 @@ apimanager.prototype.odata			=	function(req, res)	{
 						 **/
 
 						 break;
-					case "addsinal"
+					case "addsinal":
 						/**
 						 *	Add Signal
 						 **/
 						 try {
 						 	if(data.op != "")	{
-						 		if(data.hasOwnProperty("mcc") and data.hasOwnProperty("mnc"))	{
+						 		if(data.hasOwnProperty("mcc") && data.hasOwnProperty("mnc"))	{
 						 			data.op = _this.man.FetchOperatorName(data.mcc,data.mnc);
 						 			if(data.op == data.mcc + "" + data.mnc)
 						 				_this.man.InsertOperatorToDB(data.mcc,data.mnc,data.op,"BLOCK_TODO");
@@ -199,11 +255,12 @@ apimanager.prototype.odata			=	function(req, res)	{
 						 			_this.man.IncUserKM(data["uid"], 1);
 
 					 			_this.__response({"result":"OK"}, req, res);
-					 		}catch(e) {
+					 		}
+				 		}catch(e) {
 					 			_this.man.AddStatistics("apicallerror");
 								_this.log.e("Error Adding Signal: "+e+"\n\tData: "+data_s);
 					 			_this.__response({"result":"INT_ERROR"}, req, res, 500);
-					 		}
+				 		}
 						 break;
 
 					case "ttstoweradd":

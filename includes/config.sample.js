@@ -54,6 +54,10 @@ var cfg = {
 		"csspath"		:	"/var/www/hscss/"		//	Path to CSS Files
 		"basepath"		:	"/var/www/hsbase/"		//	Path to Site Base
 	}, 
+	"replaces"	: {									//	Replace Keys for Javascript and CSS
+			"SITEURL"	: 	"http://localhost/hypersignal/WebSite/", 
+			"APIURL" 	: 	"http://localhost/hypersignal/WebService/" 
+	},
 	"cookiesecret"	: "HUEHUEHUE, GIBE COOKIE SECRET!"
 };
 

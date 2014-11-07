@@ -42,27 +42,120 @@ var HYPER_BRUSH_INT	=	[
 						];						
 
 /*
-	HyperSignal Functions
+	WebSite Functions
 */
 
-/*
-	Entra com Latitude e Longitude, retorna x e y nas coordenadas do HyperSignal
-*/
+
+/**
+ *	Language Manager
+ **/
+var LanguageManager = function(path,log)	{
+	this.path = path;
+	this.langdata = {};
+	this.log = log;
+}
+
+/**
+ *	Changes [KEY] by VALUE in text in the asked language.
+ **/
+
+LanguageManager.prototype.LangReplace =	function(text, language, cb)	{
+	var _this = this;
+	var log = this.log;
+	language = language || "default";
+	if(this.langdata.hasOwnProperty(language))	
+		this.__LangReplace(text,language,cb);
+	else{
+		this.__LoadLanguage(text, language, function(ok)	{
+			if(ok)
+				_this.__LangReplace(text,language,cb);
+			else
+				_this.__LoadDefault(function(ok)	{
+					if(ok)
+						_this.__LangReplace(text,language,cb);
+					else{
+						log.e("ERROR: Cannot load default language file!!!");
+						cb(text);
+					}
+				});
+		});
+	}
+}
+
+/**
+ *	Loads specified Language File
+ **/
+LanguageManager.prototype.__LoadLanguage	=	function(language,cb)	{
+	var log = this.log;
+	var _this = this;
+	langfile = this.path +"/"+ language + "/keywords.json";
+	fs.exists(langfile, function(exists)	{
+		if(exists)
+			fs.readFile(langfile, function (err, data) {
+				if(err)	{
+					log.e("Error loading "+langfile+": "+err);
+					cb(false);
+				}else{
+					try{
+						var data = JSON.parse(data);
+						_this.langdata[language] = data;
+						log.i("Loaded Language file for "+language);
+						cb(true);
+					}catch(e)	{
+						log.e("Error parsing Language File "+langfile+": "+e);
+						cb(false);
+					}
+				}
+			});
+		else{
+			log.w("Warning: Language file "+langfile+" does not exists!");
+			cb(false);
+		}
+	});
+}
+
+/**
+ *	Loads Default Language File
+ **/
+LanguageManager.prototype.__LoadDefault		=	function(cb)	{
+	this.__LoadLanguage("default",cb);
+}
+
+/**
+ *	Does an replace considering that language as already been loaded
+ **/
+LanguageManager.prototype.__LangReplace 	=	function(text,lang,cb)	{
+	for(var i in this.langdata[language])	{
+		if(this.langdata[language].hasOwnProperty(i))	{
+			var re = new RegExp("\\["+i+"\\]","g");
+			text = text.replace(re,this.langdata[language][i]);
+		}
+	}
+	cb(text);
+}
+
+/**
+ *	HyperSignal Functions
+ **/
+
+/**
+ *	Returns HyperSignal X and Y coordinates with Latitude and Longitude Inputs
+ **/
 function LatLonToHyper(lat,lon)	{
 	return [Math.round(Math.ceil((lon+180)/HYPER_STEP)), Math.round(Math.ceil((lat+90)/HYPER_STEP))];
 }
 
-/*
-	Entra com a coordenada do HyperSignal e retorna latitude,longitude
-*/
+/**
+ *	Returns Latitude and Longitude for HyperSignal Coordinates
+ **/
 function HyperToLatLon(x,y)	{
 	return [ y * HYPER_STEP - 90,  x * HYPER_STEP - 180 ];
 }
 
-/*
-	Retorna range do Tile da google nas coordenadas do HyperSignal
-	(xmin, xmax, ymin, ymax)
-*/
+/**
+ *	Returns Google Tile Range for HyperSignal Coordinates
+ *	(xmin, xmax, ymin, ymax)
+ **/
 function GetGoogleTileHSRange(z,x,y) {
 	var bounds 	= 	tool.GoogleTileLatLonBounds(z,x,y)
 	var b1		=	LatLonToHyper(bounds[0],bounds[1])
@@ -70,14 +163,17 @@ function GetGoogleTileHSRange(z,x,y) {
 	return [ b1[0], b2[0], b1[1], b2[1] ]
 }
 
-/*
-	Retorna o z,y,x do tile da google onde o HS(x,y) está.
-*/
+/**
+ *	Returns Google Tile (z,y,x) where HS(x,y) is
+ **/
 function GetGoogleTileFromHS(x,y,zoom) {
 	latlon	=	HyperToLatLon(x,y)
 	return tool.GoogleTile(latlon[0], latlon[1], zoom)
 }
 
+/**
+ *	Filters the Operator Name
+ **/
 function CorrectOperator(val)	{
 	return val;	//	TODO
 }
@@ -97,10 +193,26 @@ var HSManager = function(config,hslog)	{
 	queues(this.conn, DEBUG);
 }
 
+/**
+ *	Connects to the Database
+ **/
 HSManager.prototype.ConnectDB			=	function()	{	this.log.i("Connecting to MySQL");		this.conn.connect();	}
+
+/**
+ *	Disconnects to the Database
+ **/
+
 HSManager.prototype.DisconnectDB		=	function()	{	this.log.i("Disconnecting from MySQL"); this.conn.end();		}
+
+/**
+ *	Generates a Google Tile
+ **/
 HSManager.prototype.GenerateGoogleTile	= 	function() 	{	this.log.e("HSManager::GenerateGoogleTile not available on NodeJS version!");	}
 
+
+/**
+ *	Inserts a signal point to database
+ **/
 HSManager.prototype.InsertToDB			= 	function(x,y,value,operator,weight,client,errcb)		{
 	var log = this.log;
 	weight = weight === undefined ? 1 : weight;
@@ -117,6 +229,9 @@ HSManager.prototype.InsertToDB			= 	function(x,y,value,operator,weight,client,er
 	}
 }
 
+/**
+ *	Inserts a Google Tile at Database
+ **/
 HSManager.prototype.InsertTileToDB		=	function(z,x,y,operator,client,errcb)	{
 	var log = this.log;
 	client = client || this.conn;
@@ -130,6 +245,9 @@ HSManager.prototype.InsertTileToDB		=	function(z,x,y,operator,client,errcb)	{
 	});
 }
 
+/**
+ *	Inserts an Mobile Operator to Database
+ **/
 HSManager.prototype.InsertOperatorToDB		=	function(mcc,mnc,name,fullname,client,errcb)	{
 	fullname = fullname || "";
 	var log = this.log;
@@ -144,6 +262,9 @@ HSManager.prototype.InsertOperatorToDB		=	function(mcc,mnc,name,fullname,client,
 	});
 }
 
+/**
+ *	Increments an Statistics Value on Database
+ **/
 HSManager.prototype.AddStatistics			=	function(stype, count, client, errcb)	{
 	var log = this.log;
 	client = client || this.conn;
@@ -158,6 +279,9 @@ HSManager.prototype.AddStatistics			=	function(stype, count, client, errcb)	{
 	});
 }
 
+/**
+ *	Processes a Recevied Signal Data
+ **/
 HSManager.prototype.ProcessSignal			=	function(lat,lon,value,operator,weight, cb)	{
 	weight = weight === undefined ? 1 : weight;
 	if (operator.trim() == "" || operator == "None" || operator == undefined || value < 0 || value > 31 )
@@ -246,6 +370,9 @@ HSManager.prototype.ProcessSignal			=	function(lat,lon,value,operator,weight, cb
 	});
 }
 
+/**
+ *	Adds an user to database
+ **/
 HSManager.prototype.AddUser 				=	function(username,uid,name,email,lastip,city,country,client,errcb)	{
 	var log = this.log;
 	client = client || this.conn;
@@ -260,6 +387,9 @@ HSManager.prototype.AddUser 				=	function(username,uid,name,email,lastip,city,c
 	});	
 }
 
+/**
+ *	Increments User Sent kilometer Data
+ **/
 HSManager.prototype.IncUserKM 				=	function(uid,val,client,errcb)	{
 	var log = this.log;
 	client = client || this.conn;
@@ -273,6 +403,10 @@ HSManager.prototype.IncUserKM 				=	function(uid,val,client,errcb)	{
 				errcb(err);	
 	});	
 }
+
+/**
+ *	Inserts an Antenna to Database
+ **/
 HSManager.prototype.AddAntenna 				=	function(lat,lon,operator,client,errcb)	{
 	operator = OperatorCorrect(operator)
 	var log = this.log;
@@ -288,6 +422,9 @@ HSManager.prototype.AddAntenna 				=	function(lat,lon,operator,client,errcb)	{
 	this.AddStatistics("tower");
 }
 
+/**
+ *	Inserts an Device to Database
+ **/
 HSManager.prototype.AddDevice 				=	function(uid, device, manufacturer, model, brand, android, release, signal,client,errcb)	{
 	var log = this.log;
 	client = client || this.conn;
@@ -301,7 +438,9 @@ HSManager.prototype.AddDevice 				=	function(uid, device, manufacturer, model, b
 	});	
 }
 
-
+/**
+ *	Fetch Antennas from Database
+ **/
 HSManager.prototype.FetchAntennas 			=	function(minlat,minlon,maxlat,maxlon,operator,client,cb)	{
 	var log = this.log;
 	client = client || this.conn;
@@ -316,6 +455,9 @@ HSManager.prototype.FetchAntennas 			=	function(minlat,minlon,maxlat,maxlon,oper
 	});	
 }
 
+/**
+ *	Fetch Operators from Database
+ **/
 HSManager.prototype.FetchOperators 				=	function(client,errcb)	{
 	var log = this.log;
 	client = client || this.conn;
@@ -333,7 +475,9 @@ HSManager.prototype.FetchOperators 				=	function(client,errcb)	{
 	});	
 }
 
-
+/**
+ *	Fetch Statistics of the Day
+ **/
 HSManager.prototype.FetchDayStatistics 			=	function(client,errcb)	{
 	var log = this.log;
 	client = client || this.conn;
@@ -351,6 +495,9 @@ HSManager.prototype.FetchDayStatistics 			=	function(client,errcb)	{
 	});	
 }
 
+/**
+ *	Fetch Number of Operators
+ **/
 HSManager.prototype.FetchNumOperators 			=	function(client,errcb)	{
 	self.cursor = self.con.cursor()
 	self.cursor.execute("")
@@ -370,6 +517,7 @@ HSManager.prototype.FetchNumOperators 			=	function(client,errcb)	{
 
 	});	
 }
+
 /*
 
 TODO
@@ -438,7 +586,10 @@ HSManager.prototype.FetchBlock 					=	function(self,start,end,operator,client,er
 	return block
 */
 
-
-
-
-exports.HSManager = HSManager;
+exports.HSManager 				= 	HSManager;
+exports.LanguageManager 		= 	LanguageManager;
+exports.LatLonToHyper 			= 	LatLonToHyper;
+exports.HyperToLatLon 			= 	HyperToLatLon;
+exports.GetGoogleTileHSRange 	= 	GetGoogleTileHSRange;
+exports.GetGoogleTileFromHS 	= 	GetGoogleTileFromHS;
+exports.CorrectOperator 		= 	CorrectOperator;
